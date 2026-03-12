@@ -274,6 +274,7 @@ class ProvidersConfig(Base):
     openai: ProviderConfig = Field(default_factory=ProviderConfig)
     openrouter: ProviderConfig = Field(default_factory=ProviderConfig)
     deepseek: ProviderConfig = Field(default_factory=ProviderConfig)
+    xai: ProviderConfig = Field(default_factory=ProviderConfig)  # XAI / Grok
     groq: ProviderConfig = Field(default_factory=ProviderConfig)
     zhipu: ProviderConfig = Field(default_factory=ProviderConfig)
     dashscope: ProviderConfig = Field(default_factory=ProviderConfig)

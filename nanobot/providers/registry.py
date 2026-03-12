@@ -308,6 +308,23 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         strip_model_prefix=False,
         model_overrides=(),
     ),
+    # XAI: needs "xai/" prefix for LiteLLM routing (Grok models).
+    ProviderSpec(
+        name="xai",
+        keywords=("xai", "grok"),
+        env_key="XAI_API_KEY",
+        display_name="XAI (Grok)",
+        litellm_prefix="xai",  # grok-4 → xai/grok-4
+        skip_prefixes=("xai/",),  # avoid double-prefix
+        env_extras=(),
+        is_gateway=False,
+        is_local=False,
+        detect_by_key_prefix="",
+        detect_by_base_keyword="",
+        default_api_base="",
+        strip_model_prefix=False,
+        model_overrides=(),
+    ),
     # Gemini: needs "gemini/" prefix for LiteLLM.
     ProviderSpec(
         name="gemini",
