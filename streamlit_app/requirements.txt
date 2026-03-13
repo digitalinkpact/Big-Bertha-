@@ -1,0 +1,4 @@
+# Streamlit voice chatbot - additional dependencies
+streamlit>=1.33.0
+streamlit-local-storage>=0.0.20
+pyttsx3>=2.98
