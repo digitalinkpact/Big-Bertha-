@@ -42,12 +42,18 @@ _LOGIN_LOCKOUT_SECONDS = 300    # 5-minute lockout
 # ---------------------------------------------------------------------------
 # Password protection with brute-force lockout
 # ---------------------------------------------------------------------------
-# Priority: st.secrets > env var > fallback (change the fallback immediately)
+# Priority: st.secrets > env var (no fallback — password must be explicitly set)
 def _get_app_password() -> str:
     try:
         return st.secrets["NANOBOT_UI_PASSWORD"]
     except (KeyError, FileNotFoundError):
-        return os.environ.get("NANOBOT_UI_PASSWORD", "nanobot123")
+        pw = os.environ.get("NANOBOT_UI_PASSWORD")
+        if not pw:
+            raise RuntimeError(
+                "NANOBOT_UI_PASSWORD is not set. "
+                "Set it via environment variable or Streamlit secrets."
+            )
+        return pw
 
 _APP_PASSWORD = _get_app_password()
 
