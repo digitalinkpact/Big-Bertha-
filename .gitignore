@@ -2,6 +2,9 @@
 .assets
 .env
 *.pyc
+*.db
+*.db-wal
+*.db-shm
 dist/
 build/
 docs/

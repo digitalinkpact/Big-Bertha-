@@ -6,8 +6,7 @@ Features:
 - Text input fallback
 - Nanobot agent loop for responses
 - pyttsx3 TTS (offline-capable)
-- Session state chat history
-- Password protection with brute-force lockout
+- Multi-user auth with email confirmation + admin approval
 - Browser localStorage for per-user memory
 - Provider routing: Ollama → Grok → DeepSeek fallback
 - Rate limiting per session
@@ -15,7 +14,6 @@ Features:
 
 import asyncio
 import hashlib
-import hmac
 import os
 import re
 import tempfile
@@ -30,67 +28,25 @@ import streamlit as st
 st.set_page_config(page_title="Nanobot Voice Chat", page_icon="🐈", layout="centered")
 
 # ---------------------------------------------------------------------------
+# Initialise auth database
+# ---------------------------------------------------------------------------
+from streamlit_app.auth.db import init_db
+init_db()
+
+# ---------------------------------------------------------------------------
 # Constants / limits
 # ---------------------------------------------------------------------------
 _MAX_MESSAGES_PER_SESSION = 100  # rate limit: max messages before cooldown
 _RATE_COOLDOWN_SECONDS = 60     # wait time after hitting limit
 _MAX_TEXT_LENGTH = 4000          # max chars per user message
 _MAX_AUDIO_BYTES = 10 * 1024 * 1024  # 10 MB max audio upload
-_MAX_LOGIN_ATTEMPTS = 5         # lockout after N wrong passwords
-_LOGIN_LOCKOUT_SECONDS = 300    # 5-minute lockout
 
 # ---------------------------------------------------------------------------
-# Password protection with brute-force lockout
+# Multi-user authentication (signup, login, email confirm, admin, reset)
 # ---------------------------------------------------------------------------
-# Priority: st.secrets > env var (no fallback — password must be explicitly set)
-def _get_app_password() -> str:
-    try:
-        return st.secrets["NANOBOT_UI_PASSWORD"]
-    except (KeyError, FileNotFoundError):
-        pw = os.environ.get("NANOBOT_UI_PASSWORD")
-        if not pw:
-            raise RuntimeError(
-                "NANOBOT_UI_PASSWORD is not set. "
-                "Set it via environment variable or Streamlit secrets."
-            )
-        return pw
+from streamlit_app.auth.pages import show_login_page, show_admin_panel
 
-_APP_PASSWORD = _get_app_password()
-
-
-def _check_password():
-    """Show login screen; return True when authenticated."""
-    if st.session_state.get("authenticated"):
-        return True
-
-    # Brute-force lockout
-    attempts = st.session_state.get("login_attempts", 0)
-    lockout_until = st.session_state.get("lockout_until", 0)
-    if time.time() < lockout_until:
-        remaining = int(lockout_until - time.time())
-        st.title("🔒 Nanobot Voice Chat")
-        st.error(f"Too many failed attempts. Try again in {remaining}s.")
-        return False
-
-    st.title("🔒 Nanobot Voice Chat")
-    pwd = st.text_input("Password", type="password", key="pw_input")
-    if st.button("Login"):
-        if hmac.compare_digest(pwd, _APP_PASSWORD):
-            st.session_state["authenticated"] = True
-            st.session_state["login_attempts"] = 0
-            st.rerun()
-        else:
-            attempts += 1
-            st.session_state["login_attempts"] = attempts
-            if attempts >= _MAX_LOGIN_ATTEMPTS:
-                st.session_state["lockout_until"] = time.time() + _LOGIN_LOCKOUT_SECONDS
-                st.error(f"Locked out for {_LOGIN_LOCKOUT_SECONDS // 60} minutes.")
-            else:
-                st.error(f"Incorrect password. ({_MAX_LOGIN_ATTEMPTS - attempts} attempts remaining)")
-    return False
-
-
-if not _check_password():
+if not show_login_page():
     st.stop()
 
 # ---------------------------------------------------------------------------
@@ -400,6 +356,11 @@ if "user_facts" not in st.session_state:
 # UI
 # ---------------------------------------------------------------------------
 
+# Display logged-in user info
+_current_user = st.session_state.get("current_user", {})
+if _current_user:
+    st.caption(f"Logged in as **{_current_user.get('email', '')}**")
+
 st.title("🐈 Nanobot Voice Chat")
 
 # Sidebar: settings & memory
@@ -449,7 +410,14 @@ with st.sidebar:
 
     if st.button("🚪 Logout", use_container_width=True):
         st.session_state["authenticated"] = False
+        st.session_state.pop("current_user", None)
         st.rerun()
+
+    # Admin panel (only visible to admins)
+    current_user = st.session_state.get("current_user", {})
+    if current_user.get("is_admin"):
+        st.divider()
+        show_admin_panel()
 
 # Display chat history
 for msg in st.session_state["messages"]:
