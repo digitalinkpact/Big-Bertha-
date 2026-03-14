@@ -8,7 +8,7 @@ Features:
 - pyttsx3 TTS (offline-capable)
 - Multi-user auth with email confirmation + admin approval
 - Browser localStorage for per-user memory
-- Provider routing: Ollama → Grok → DeepSeek fallback
+- Provider routing: ChatGPT → Ollama → Grok → DeepSeek fallback
 - Rate limiting per session
 """
 
@@ -93,6 +93,7 @@ def _load_nanobot_config() -> Config:
 # Model choices available in the sidebar
 _MODEL_OPTIONS: dict[str, tuple[str, str]] = {
     # label -> (provider_name, model_string)
+    "ChatGPT (OpenAI)": ("openai", "gpt-4o"),
     "Ollama (local)": ("ollama", "ollama/llama3.2"),
     "Grok (XAI)": ("xai", "xai/grok-4-1-fast-reasoning"),
     "DeepSeek": ("deepseek", "deepseek/deepseek-chat"),
@@ -105,6 +106,7 @@ def _available_models(config: Config) -> list[str]:
     providers = config.providers
     available = []
     checks = [
+        ("ChatGPT (OpenAI)", lambda: bool(providers.openai.api_key)),
         ("Ollama (local)", lambda: bool(providers.ollama.api_base)),
         ("Grok (XAI)", lambda: bool(providers.xai.api_key)),
         ("DeepSeek", lambda: bool(providers.deepseek.api_key)),
