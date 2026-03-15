@@ -16,9 +16,15 @@ import asyncio
 import hashlib
 import os
 import re
+import sys
 import tempfile
 import time
 from pathlib import Path
+
+# Ensure the workspace root is on sys.path so "from streamlit_app.auth..." resolves
+_WORKSPACE_ROOT = str(Path(__file__).resolve().parent.parent)
+if _WORKSPACE_ROOT not in sys.path:
+    sys.path.insert(0, _WORKSPACE_ROOT)
 
 import streamlit as st
 
