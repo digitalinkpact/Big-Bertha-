@@ -1,11 +1,11 @@
 [project]
-name = "nanobot-ai"
+name = "baccano-ai"
 version = "0.1.4.post4"
-description = "A lightweight personal AI assistant framework"
+description = "Baccano AI - Personal AI desktop assistant for design, engineering & business"
 requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
-    {name = "nanobot contributors"}
+    {name = "Baccano AI contributors"}
 ]
 keywords = ["ai", "agent", "chatbot"]
 classifiers = [
@@ -64,8 +64,14 @@ dev = [
     "mistune>=3.0.0,<4.0.0",
     "nh3>=0.2.17,<1.0.0",
 ]
+desktop = [
+    "pyinstaller>=6.0.0",
+    "pystray>=0.19.5",
+    "Pillow>=10.0.0",
+]
 
 [project.scripts]
+baccano = "nanobot.cli.commands:app"
 nanobot = "nanobot.cli.commands:app"
 
 [build-system]

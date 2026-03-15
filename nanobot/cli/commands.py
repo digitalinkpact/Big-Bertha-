@@ -36,8 +36,8 @@ from nanobot.config.schema import Config
 from nanobot.utils.helpers import sync_workspace_templates
 
 app = typer.Typer(
-    name="nanobot",
-    help=f"{__logo__} nanobot - Personal AI Assistant",
+    name="baccano",
+    help=f"{__logo__} Baccano AI - Personal AI Assistant",
     no_args_is_help=True,
 )
 

@@ -6,8 +6,8 @@ x-common-config: &common-config
     - ~/.nanobot:/root/.nanobot
 
 services:
-  nanobot-gateway:
-    container_name: nanobot-gateway
+  baccano-gateway:
+    container_name: baccano-gateway
     <<: *common-config
     command: ["gateway"]
     restart: unless-stopped
@@ -22,7 +22,7 @@ services:
           cpus: '0.25'
           memory: 256M
   
-  nanobot-cli:
+  baccano-cli:
     <<: *common-config
     profiles:
       - cli

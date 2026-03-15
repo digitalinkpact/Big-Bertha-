@@ -1,10 +1,10 @@
 """
-Private Voice Chatbot — Streamlit UI for Nanobot
+Baccano AI — Desktop AI Assistant
 
 Features:
 - Browser mic input (st.audio_input) → Whisper STT (Groq or local)
 - Text input fallback
-- Nanobot agent loop for responses
+- Baccano AI agent loop for responses
 - pyttsx3 TTS (offline-capable)
 - Multi-user auth with email confirmation + admin approval
 - Browser localStorage for per-user memory
@@ -25,7 +25,7 @@ import streamlit as st
 # ---------------------------------------------------------------------------
 # Page config (must be first Streamlit call)
 # ---------------------------------------------------------------------------
-st.set_page_config(page_title="Nanobot Voice Chat", page_icon="🐈", layout="centered")
+st.set_page_config(page_title="Baccano AI", page_icon="🤖", layout="centered")
 
 # ---------------------------------------------------------------------------
 # Initialise auth database
@@ -86,7 +86,7 @@ def _ls_set(key: str, value):
 # ---------------------------------------------------------------------------
 
 @st.cache_resource
-def _load_nanobot_config() -> Config:
+def _load_baccano_config() -> Config:
     return load_config()
 
 
@@ -145,8 +145,9 @@ def _build_provider(config: Config, chosen_label: str = "Auto (config default)")
     # --- Auto: ordered fallback chain ---
     chain = [
         ("ollama", providers.ollama, "ollama/llama3.2"),
-        ("xai", providers.xai, "xai/grok-4-1-fast-reasoning"),
         ("deepseek", providers.deepseek, "deepseek/deepseek-chat"),
+        ("openai", providers.openai, "gpt-4o"),
+        ("xai", providers.xai, "xai/grok-4-1-fast-reasoning"),
     ]
 
     for name, pcfg, default_model in chain:
@@ -182,7 +183,7 @@ def _get_agent(chosen_model: str = "Auto (config default)") -> tuple[AgentLoop, 
     if cache_key in st.session_state:
         return st.session_state[cache_key]
 
-    config = _load_nanobot_config()
+    config = _load_baccano_config()
     provider, model = _build_provider(config, chosen_model)
     workspace = config.workspace_path
     workspace.mkdir(parents=True, exist_ok=True)
@@ -219,7 +220,7 @@ def _transcribe_audio(audio_bytes: bytes) -> str:
 
     try:
         # Try Groq Whisper (fast, free tier)
-        config = _load_nanobot_config()
+        config = _load_baccano_config()
         groq_key = (
             config.providers.groq.api_key
             if config.providers.groq.api_key
@@ -326,14 +327,53 @@ def _run_async(coro):
 
 
 def _get_agent_reply(user_text: str, model_choice: str = "Auto (config default)") -> str:
-    """Send user text to the Nanobot agent and get a response."""
+    """Send user text to the Baccano AI agent and get a response.
+
+    When a specific provider is chosen and fails, automatically tries the
+    fallback chain so the user still gets a response.
+    """
     agent, _model = _get_agent(model_choice)
     try:
         reply = _run_async(agent.process_direct(user_text))
     except TimeoutError:
         reply = "The model took too long to respond. Please try again."
     except Exception as e:
-        reply = f"Error getting response: {e}"
+        reply = f"Error calling LLM: {e}"
+
+    # If the LLM returned an error (quota, auth, etc.), try fallback providers
+    if reply and reply.startswith("Error calling LLM:"):
+        original_error = reply
+        config = _load_baccano_config()
+        fallback_order = [
+            ("deepseek", config.providers.deepseek, "deepseek/deepseek-chat"),
+            ("openai", config.providers.openai, "gpt-4o"),
+            ("xai", config.providers.xai, "xai/grok-4-1-fast-reasoning"),
+        ]
+        for name, pcfg, fallback_model in fallback_order:
+            if not pcfg.api_key or name == _model.split("/")[0]:
+                continue  # skip unconfigured or the one that just failed
+            try:
+                fb_provider = LiteLLMProvider(
+                    api_key=pcfg.api_key,
+                    api_base=pcfg.api_base,
+                    default_model=fallback_model,
+                    provider_name=name,
+                )
+                fb_reply = _run_async(
+                    fb_provider.chat(
+                        messages=[{"role": "user", "content": user_text}],
+                        model=fallback_model,
+                        max_tokens=4096,
+                    )
+                )
+                if fb_reply.content and not fb_reply.content.startswith("Error calling LLM:"):
+                    st.toast(f"Primary model failed — responded via {name.upper()}", icon="⚡")
+                    return fb_reply.content
+            except Exception:
+                continue
+        # All fallbacks failed — show user-friendly message
+        return f"All providers failed. Please check your API keys and billing.\n\n_Details: {original_error}_"
+
     return reply or "_(no response)_"
 
 
@@ -343,14 +383,14 @@ def _get_agent_reply(user_text: str, model_choice: str = "Auto (config default)"
 
 if "messages" not in st.session_state:
     # Try to restore from localStorage
-    saved = _ls_get("nanobot_chat_history")
+    saved = _ls_get("baccano_chat_history")
     if saved and isinstance(saved, list):
         st.session_state["messages"] = saved
     else:
         st.session_state["messages"] = []
 
 if "user_facts" not in st.session_state:
-    saved_facts = _ls_get("nanobot_user_facts")
+    saved_facts = _ls_get("baccano_user_facts")
     st.session_state["user_facts"] = saved_facts if isinstance(saved_facts, dict) else {}
 
 
@@ -363,12 +403,12 @@ _current_user = st.session_state.get("current_user", {})
 if _current_user:
     st.caption(f"Logged in as **{_current_user.get('email', '')}**")
 
-st.title("🐈 Nanobot Voice Chat")
+st.title("🤖 Baccano AI")
 
 # Sidebar: settings & memory
 with st.sidebar:
     st.header("⚙️ Model")
-    config = _load_nanobot_config()
+    config = _load_baccano_config()
     model_labels = _available_models(config)
     chosen_model = st.selectbox(
         "LLM provider",
@@ -402,12 +442,12 @@ with st.sidebar:
     with col_a:
         if st.button("🗑️ Clear history"):
             st.session_state["messages"] = []
-            _ls_set("nanobot_chat_history", [])
+            _ls_set("baccano_chat_history", [])
             st.rerun()
     with col_b:
         if st.button("🗑️ Clear memory"):
             st.session_state["user_facts"] = {}
-            _ls_set("nanobot_user_facts", {})
+            _ls_set("baccano_user_facts", {})
             st.rerun()
 
     if st.button("🚪 Logout", use_container_width=True):
@@ -516,7 +556,7 @@ if user_text:
                 _autoplay_audio_html(tts_audio)  # fallback for browsers ignoring autoplay
 
         # Persist to localStorage
-        _ls_set("nanobot_chat_history", st.session_state["messages"][-50:])
+        _ls_set("baccano_chat_history", st.session_state["messages"][-50:])
 
         # Simple fact extraction: if the bot says "I'll remember that" or similar,
         # store the user message as a fact
@@ -524,4 +564,4 @@ if user_text:
         if any(phrase in reply_lower for phrase in ("i'll remember", "noted", "i've noted", "got it")):
             key = f"fact_{len(st.session_state['user_facts'])}"
             st.session_state["user_facts"][key] = user_text[:200]
-            _ls_set("nanobot_user_facts", st.session_state["user_facts"])
+            _ls_set("baccano_user_facts", st.session_state["user_facts"])

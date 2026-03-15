@@ -128,6 +128,14 @@ class AgentLoop:
         if self.cron_service:
             self.tools.register(CronTool(self.cron_service))
 
+        # Register desktop tools (Illustrator, AutoCAD, SolidWorks, Blender)
+        # when running on a local workstation.
+        try:
+            from desktop.tools.register import register_desktop_tools
+            register_desktop_tools(self.tools)
+        except ImportError:
+            pass  # desktop package not available (e.g. cloud deployment)
+
     async def _connect_mcp(self) -> None:
         """Connect to configured MCP servers (one-time, lazy)."""
         if self._mcp_connected or self._mcp_connecting or not self._mcp_servers:
