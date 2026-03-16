@@ -353,11 +353,6 @@ def _get_agent_reply(user_text: str, model_choice: str = "Auto (config default)"
     if reply and reply.startswith("Error calling LLM:"):
         original_error = reply
         config = _load_baccano_config()
-        _BACCANO_SYSTEM = (
-            "You are Baccano AI, a helpful AI assistant created by Digital Ink Pact. "
-            "Always identify yourself as Baccano AI. Never say you are DeepSeek, "
-            "ChatGPT, GPT, Grok, or any other AI. You were made by Digital Ink Pact."
-        )
         fallback_order = [
             ("xai", config.providers.xai, "xai/grok-4-1-fast-reasoning"),
             ("openai", config.providers.openai, "gpt-4o"),
@@ -373,19 +368,21 @@ def _get_agent_reply(user_text: str, model_choice: str = "Auto (config default)"
                     default_model=fallback_model,
                     provider_name=name,
                 )
-                fb_reply = _run_async(
-                    fb_provider.chat(
-                        messages=[
-                            {"role": "system", "content": _BACCANO_SYSTEM},
-                            {"role": "user", "content": user_text},
-                        ],
-                        model=fallback_model,
-                        max_tokens=4096,
-                    )
+                fb_agent = AgentLoop(
+                    bus=MessageBus(),
+                    provider=fb_provider,
+                    workspace=config.workspace_path,
+                    model=fallback_model,
+                    max_iterations=config.agents.defaults.max_tool_iterations,
+                    context_window_tokens=config.agents.defaults.context_window_tokens,
+                    brave_api_key=config.tools.web.search.api_key or None,
+                    web_proxy=config.tools.web.proxy,
+                    restrict_to_workspace=config.tools.restrict_to_workspace,
                 )
-                if fb_reply.content and not fb_reply.content.startswith("Error calling LLM:"):
+                fb_reply = _run_async(fb_agent.process_direct(user_text))
+                if fb_reply and not fb_reply.startswith("Error calling LLM:"):
                     st.toast(f"Primary model failed — responded via {name.upper()}", icon="⚡")
-                    return fb_reply.content
+                    return fb_reply
             except Exception:
                 continue
         # All fallbacks failed — show user-friendly message
