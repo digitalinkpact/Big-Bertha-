@@ -5,16 +5,16 @@ set -e
 WORKSPACE="/workspaces/Big-Bertha-"
 cd "$WORKSPACE"
 
-echo "=== Step 1: Recreate .venv ==="
-rm -rf .venv
-python3 -m venv .venv
+echo "=== Step 1: Ensure .venv ==="
+if [ ! -d .venv ]; then
+    python3 -m venv .venv
+fi
 source .venv/bin/activate
-python -m ensurepip --upgrade 2>/dev/null || true
-pip install --upgrade pip
+pip install --upgrade pip -q
 
 echo "=== Step 2: Install nanobot + streamlit deps ==="
 pip install -e ".[dev]"
-pip install streamlit streamlit-local-storage pyttsx3
+pip install -r streamlit_app/requirements.txt
 
 echo "=== Step 3: Git commit & push ==="
 git add streamlit_app/ || true

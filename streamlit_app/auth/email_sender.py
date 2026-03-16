@@ -53,23 +53,23 @@ def _send(to: str, subject: str, html_body: str) -> bool:
 
 def send_verification_email(to: str, token: str, base_url: str) -> bool:
     """Send email-confirmation link."""
-    link = f"{base_url.rstrip('/')}/verify-email?token={token}"
+    link = f"{base_url.rstrip('/')}/?page=verify-email&token={token}"
     html = f"""
     <h2>Confirm your email</h2>
     <p>Click the link below to verify your account:</p>
     <p><a href="{link}">{link}</a></p>
     <p>This link expires in 48 hours.</p>
     """
-    return _send(to, "Verify your Nanobot account", html)
+    return _send(to, "Verify your Baccano AI account", html)
 
 
 def send_password_reset_email(to: str, token: str, base_url: str) -> bool:
     """Send password-reset link."""
-    link = f"{base_url.rstrip('/')}/reset-password?token={token}"
+    link = f"{base_url.rstrip('/')}/?page=reset-password&token={token}"
     html = f"""
     <h2>Reset your password</h2>
     <p>Click below to set a new password:</p>
     <p><a href="{link}">{link}</a></p>
     <p>This link expires in 1 hour. If you didn't request this, ignore this email.</p>
     """
-    return _send(to, "Password Reset — Nanobot", html)
+    return _send(to, "Password Reset — Baccano AI", html)
