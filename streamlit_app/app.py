@@ -27,6 +27,10 @@ _WORKSPACE_ROOT = str(Path(__file__).resolve().parent.parent)
 if _WORKSPACE_ROOT not in sys.path:
     sys.path.insert(0, _WORKSPACE_ROOT)
 
+# Load .env file (must be before any os.environ.get calls)
+from dotenv import load_dotenv
+load_dotenv(Path(_WORKSPACE_ROOT) / ".env")
+
 import streamlit as st
 
 # ---------------------------------------------------------------------------
