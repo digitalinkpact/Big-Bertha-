@@ -133,12 +133,24 @@ def _available_models(config: Config) -> list[str]:
     return available
 
 
+def _get_api_key(pcfg, env_var: str) -> str:
+    """Get API key from config, then env var, then st.secrets."""
+    if pcfg.api_key:
+        return pcfg.api_key
+    if os.environ.get(env_var):
+        return os.environ[env_var]
+    try:
+        return st.secrets.get(env_var, "")
+    except (KeyError, FileNotFoundError):
+        return ""
+
+
 def _build_provider(config: Config, chosen_label: str = "Auto (config default)") -> tuple[LiteLLMProvider, str]:
     """
     Build the LLM provider.
 
     If chosen_label is a specific model, use it directly.
-    If 'Auto', fall back through: Ollama → Grok → DeepSeek → config default.
+    If 'Auto', fall back through the chain using config + env vars + st.secrets.
 
     Returns (provider, model_name).
     """
@@ -158,25 +170,28 @@ def _build_provider(config: Config, chosen_label: str = "Auto (config default)")
             ), model_str
 
     # --- Auto: ordered fallback chain ---
-    # DeepSeek first — xAI and OpenAI are currently out of credits.
-    # Re-order when credits are replenished.
+    # Checks config file, then env vars, then st.secrets for each provider.
     chain = [
-        ("deepseek", providers.deepseek, "deepseek/deepseek-chat"),
-        ("xai", providers.xai, "xai/grok-4-1-fast-reasoning"),
-        ("openai", providers.openai, "gpt-4o"),
-        ("ollama", providers.ollama, "ollama/llama3.2"),
+        ("deepseek", providers.deepseek, "deepseek/deepseek-chat", "DEEPSEEK_API_KEY"),
+        ("xai", providers.xai, "xai/grok-4-1-fast-reasoning", "XAI_API_KEY"),
+        ("openai", providers.openai, "gpt-4o", "OPENAI_API_KEY"),
+        ("ollama", providers.ollama, "ollama/llama3.2", ""),
     ]
 
-    for name, pcfg, default_model in chain:
+    for name, pcfg, default_model, env_var in chain:
         if name == "ollama" and pcfg.api_base:
             return LiteLLMProvider(
                 api_base=pcfg.api_base,
                 default_model=default_model,
                 provider_name=name,
             ), default_model
-        if pcfg.api_key:
+        key = _get_api_key(pcfg, env_var) if env_var else ""
+        if key:
+            # Also set the env var so LiteLLM picks it up
+            if env_var:
+                os.environ[env_var] = key
             return LiteLLMProvider(
-                api_key=pcfg.api_key,
+                api_key=key,
                 api_base=pcfg.api_base,
                 default_model=default_model,
                 provider_name=name,
@@ -452,20 +467,11 @@ if _current_user:
 st.title("🤖 Baccano AI")
 
 # Sidebar: settings & memory
+# Model routing is automatic (Auto) — no user-facing selector.
+chosen_model = "Auto (config default)"
 with st.sidebar:
-    st.header("⚙️ Model")
-    config = _load_baccano_config()
-    model_labels = _available_models(config)
-    chosen_model = st.selectbox(
-        "LLM provider",
-        model_labels,
-        index=0,
-        help="Ollama = fastest/most private (local). Grok/DeepSeek = cloud. Auto = best available.",
-    )
     _agent, active_model = _get_agent(chosen_model)
-    st.caption(f"Active: `{active_model}`")
 
-    st.divider()
     st.header("🔊 Voice")
     tts_enabled = st.toggle("Speak replies", value=True)
     voice_speed = st.slider(
