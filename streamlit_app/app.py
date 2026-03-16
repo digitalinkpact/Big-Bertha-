@@ -150,10 +150,10 @@ def _build_provider(config: Config, chosen_label: str = "Auto (config default)")
 
     # --- Auto: ordered fallback chain ---
     chain = [
-        ("ollama", providers.ollama, "ollama/llama3.2"),
-        ("deepseek", providers.deepseek, "deepseek/deepseek-chat"),
-        ("openai", providers.openai, "gpt-4o"),
         ("xai", providers.xai, "xai/grok-4-1-fast-reasoning"),
+        ("openai", providers.openai, "gpt-4o"),
+        ("deepseek", providers.deepseek, "deepseek/deepseek-chat"),
+        ("ollama", providers.ollama, "ollama/llama3.2"),
     ]
 
     for name, pcfg, default_model in chain:
@@ -353,10 +353,15 @@ def _get_agent_reply(user_text: str, model_choice: str = "Auto (config default)"
     if reply and reply.startswith("Error calling LLM:"):
         original_error = reply
         config = _load_baccano_config()
+        _BACCANO_SYSTEM = (
+            "You are Baccano AI, a helpful AI assistant created by Digital Ink Pact. "
+            "Always identify yourself as Baccano AI. Never say you are DeepSeek, "
+            "ChatGPT, GPT, Grok, or any other AI. You were made by Digital Ink Pact."
+        )
         fallback_order = [
-            ("deepseek", config.providers.deepseek, "deepseek/deepseek-chat"),
-            ("openai", config.providers.openai, "gpt-4o"),
             ("xai", config.providers.xai, "xai/grok-4-1-fast-reasoning"),
+            ("openai", config.providers.openai, "gpt-4o"),
+            ("deepseek", config.providers.deepseek, "deepseek/deepseek-chat"),
         ]
         for name, pcfg, fallback_model in fallback_order:
             if not pcfg.api_key or name == _model.split("/")[0]:
@@ -370,7 +375,10 @@ def _get_agent_reply(user_text: str, model_choice: str = "Auto (config default)"
                 )
                 fb_reply = _run_async(
                     fb_provider.chat(
-                        messages=[{"role": "user", "content": user_text}],
+                        messages=[
+                            {"role": "system", "content": _BACCANO_SYSTEM},
+                            {"role": "user", "content": user_text},
+                        ],
                         model=fallback_model,
                         max_tokens=4096,
                     )
