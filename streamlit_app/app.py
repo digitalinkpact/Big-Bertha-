@@ -149,10 +149,12 @@ def _build_provider(config: Config, chosen_label: str = "Auto (config default)")
             ), model_str
 
     # --- Auto: ordered fallback chain ---
+    # DeepSeek first — xAI and OpenAI are currently out of credits.
+    # Re-order when credits are replenished.
     chain = [
+        ("deepseek", providers.deepseek, "deepseek/deepseek-chat"),
         ("xai", providers.xai, "xai/grok-4-1-fast-reasoning"),
         ("openai", providers.openai, "gpt-4o"),
-        ("deepseek", providers.deepseek, "deepseek/deepseek-chat"),
         ("ollama", providers.ollama, "ollama/llama3.2"),
     ]
 
@@ -369,9 +371,9 @@ def _get_agent_reply(user_text: str, model_choice: str = "Auto (config default)"
         original_error = reply
         config = _load_baccano_config()
         fallback_order = [
+            ("deepseek", config.providers.deepseek, "deepseek/deepseek-chat"),
             ("xai", config.providers.xai, "xai/grok-4-1-fast-reasoning"),
             ("openai", config.providers.openai, "gpt-4o"),
-            ("deepseek", config.providers.deepseek, "deepseek/deepseek-chat"),
         ]
         for name, pcfg, fallback_model in fallback_order:
             if not pcfg.api_key or name == _model.split("/")[0]:
