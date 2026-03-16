@@ -70,11 +70,15 @@ desktop = [
     "pystray>=0.19.5",
     "Pillow>=10.0.0",
 ]
+browser = [
+    "selenium>=4.20.0,<5.0.0",
+]
 streamlit = [
     "streamlit>=1.33.0",
     "streamlit-local-storage>=0.0.20",
     "pyttsx3>=2.98",
     "bcrypt>=4.0.0",
+    "selenium>=4.20.0,<5.0.0",
 ]
 
 [project.scripts]
