@@ -32,7 +32,7 @@ import streamlit as st
 # ---------------------------------------------------------------------------
 # Page config (must be first Streamlit call)
 # ---------------------------------------------------------------------------
-st.set_page_config(page_title="Baccano AI", page_icon="🤖", layout="centered")
+st.set_page_config(page_title="Baccano AI", page_icon="⚡", layout="centered")
 
 # ---------------------------------------------------------------------------
 # Initialise auth database
@@ -459,29 +459,220 @@ if "user_facts" not in st.session_state:
 # UI
 # ---------------------------------------------------------------------------
 
-# Display logged-in user info
+# ---------------------------------------------------------------------------
+# Grok-style dark theme CSS
+# ---------------------------------------------------------------------------
+_GROK_CSS = """
+<style>
+/* ── Base dark background ── */
+.stApp {
+    background-color: #0d0d0d;
+    color: #e8e8e8;
+}
+section[data-testid="stSidebar"] {
+    background-color: #111111;
+    border-right: 1px solid #222;
+}
+section[data-testid="stSidebar"] * {
+    color: #ccc !important;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #0d0d0d; }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+
+/* ── Header area ── */
+header[data-testid="stHeader"] {
+    background-color: #0d0d0d !important;
+    border-bottom: 1px solid #1a1a1a;
+}
+
+/* ── Branding ── */
+.grok-brand {
+    text-align: center;
+    padding: 0.5rem 0 0.3rem 0;
+    border-bottom: 1px solid #1a1a1a;
+    margin-bottom: 1rem;
+}
+.grok-brand h1 {
+    font-family: 'Inter', 'SF Pro Display', -apple-system, sans-serif;
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+    margin: 0;
+    padding: 0;
+}
+.grok-brand .grok-sub {
+    font-size: 0.75rem;
+    color: #666;
+    margin-top: 2px;
+}
+
+/* ── Chat messages ── */
+[data-testid="stChatMessage"] {
+    background-color: transparent !important;
+    border: none !important;
+    padding: 0.8rem 0 !important;
+    max-width: 760px;
+    margin: 0 auto;
+}
+[data-testid="stChatMessage"] p,
+[data-testid="stChatMessage"] li,
+[data-testid="stChatMessage"] span {
+    color: #e0e0e0 !important;
+    font-size: 0.95rem;
+    line-height: 1.65;
+}
+/* User messages: subtle right-alignment feel */
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
+    background-color: #1a1a1a !important;
+    border-radius: 16px !important;
+    padding: 0.8rem 1.2rem !important;
+}
+/* Assistant messages */
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"]) {
+    background-color: transparent !important;
+}
+/* Avatar icons */
+[data-testid="chatAvatarIcon-user"] {
+    background-color: #2d2d2d !important;
+}
+[data-testid="chatAvatarIcon-assistant"] {
+    background-color: #1a1a2e !important;
+}
+
+/* ── Chat input ── */
+[data-testid="stChatInput"] {
+    background-color: #0d0d0d !important;
+    border-top: 1px solid #1a1a1a !important;
+    padding-top: 0.5rem;
+}
+[data-testid="stChatInput"] textarea {
+    background-color: #1a1a1a !important;
+    border: 1px solid #2a2a2a !important;
+    border-radius: 24px !important;
+    color: #e8e8e8 !important;
+    padding: 12px 20px !important;
+    font-size: 0.95rem !important;
+}
+[data-testid="stChatInput"] textarea:focus {
+    border-color: #444 !important;
+    box-shadow: 0 0 0 1px #333 !important;
+}
+[data-testid="stChatInput"] button {
+    background-color: #fff !important;
+    border-radius: 50% !important;
+    color: #000 !important;
+}
+
+/* ── Buttons ── */
+.stButton > button {
+    background-color: #1a1a1a;
+    color: #e0e0e0;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    transition: background-color 0.15s;
+}
+.stButton > button:hover {
+    background-color: #2a2a2a;
+    border-color: #444;
+    color: #fff;
+}
+
+/* ── Sidebar toggle/slider/divider ── */
+.stSlider > div > div > div { background-color: #333 !important; }
+.stSlider [data-testid="stThumbValue"] { color: #ccc !important; }
+hr { border-color: #222 !important; }
+
+/* ── Welcome empty state ── */
+.grok-welcome {
+    text-align: center;
+    padding: 4rem 2rem 2rem 2rem;
+    max-width: 600px;
+    margin: 0 auto;
+}
+.grok-welcome h2 {
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 1.8rem;
+    color: #ffffff;
+    margin-bottom: 0.5rem;
+}
+.grok-welcome p {
+    color: #888;
+    font-size: 1rem;
+    line-height: 1.5;
+}
+.grok-suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 1.5rem;
+}
+.grok-chip {
+    background-color: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 20px;
+    padding: 8px 16px;
+    color: #aaa;
+    font-size: 0.85rem;
+    cursor: default;
+}
+
+/* ── Misc: spinner, info/warning boxes ── */
+.stSpinner > div { color: #666 !important; }
+.stAlert { background-color: #1a1a1a !important; border-color: #2a2a2a !important; }
+[data-testid="stCaption"] { color: #555 !important; }
+
+/* ── Audio input ── */
+[data-testid="stAudioInput"] button {
+    background-color: #1a1a1a !important;
+    border: 1px solid #2a2a2a !important;
+    color: #ccc !important;
+}
+
+/* ── Toggle ── */
+[data-testid="stToggle"] label span { color: #ccc !important; }
+</style>
+"""
+st.markdown(_GROK_CSS, unsafe_allow_html=True)
+
+# ---------------------------------------------------------------------------
+# Branding (Grok-style centered minimal header)
+# ---------------------------------------------------------------------------
 _current_user = st.session_state.get("current_user", {})
-if _current_user:
-    st.caption(f"Logged in as **{_current_user.get('email', '')}**")
+st.markdown(
+    '<div class="grok-brand">'
+    '<h1>⚡ Baccano AI</h1>'
+    '<div class="grok-sub">Your private AI assistant</div>'
+    '</div>',
+    unsafe_allow_html=True,
+)
 
-st.title("🤖 Baccano AI")
-
-# Sidebar: settings & memory
-# Model routing is automatic (Auto) — no user-facing selector.
+# ---------------------------------------------------------------------------
+# Sidebar (clean, minimal)
+# ---------------------------------------------------------------------------
 chosen_model = "Auto (config default)"
 with st.sidebar:
     _agent, active_model = _get_agent(chosen_model)
 
-    st.header("🔊 Voice")
+    if _current_user:
+        st.caption(f"{_current_user.get('email', '')}")
+
+    st.markdown("**Voice**")
     tts_enabled = st.toggle("Speak replies", value=True)
     voice_speed = st.slider(
-        "Voice speed (WPM)",
+        "Speed (WPM)",
         min_value=80, max_value=300, value=175, step=5,
-        help="Words per minute. 175 is normal. Lower = slower.",
+        help="Words per minute. 175 is normal.",
     )
 
     st.divider()
-    st.header("🧠 Learned Memory")
+    st.markdown("**Memory**")
     facts = st.session_state.get("user_facts", {})
     if facts:
         for k, v in facts.items():
@@ -492,21 +683,20 @@ with st.sidebar:
     st.divider()
     col_a, col_b = st.columns(2)
     with col_a:
-        if st.button("🗑️ Clear history"):
+        if st.button("Clear chat", use_container_width=True):
             st.session_state["messages"] = []
             _ls_set("baccano_chat_history", [])
-            # Clear cached agents and session key so a fresh context starts
             for key in list(st.session_state.keys()):
                 if key.startswith("_agent_"):
                     del st.session_state[key]
             st.rerun()
     with col_b:
-        if st.button("🗑️ Clear memory"):
+        if st.button("Clear memory", use_container_width=True):
             st.session_state["user_facts"] = {}
             _ls_set("baccano_user_facts", {})
             st.rerun()
 
-    if st.button("🚪 Logout", use_container_width=True):
+    if st.button("Logout", use_container_width=True):
         st.session_state["authenticated"] = False
         st.session_state.pop("current_user", None)
         st.rerun()
@@ -517,41 +707,48 @@ with st.sidebar:
         st.divider()
         show_admin_panel()
 
+# ---------------------------------------------------------------------------
+# Welcome state (Grok-style empty screen with suggestions)
+# ---------------------------------------------------------------------------
+if not st.session_state["messages"]:
+    st.markdown(
+        '<div class="grok-welcome">'
+        '<h2>What can I help with?</h2>'
+        '<p>Ask me anything — I can write, analyze, brainstorm, code, and more.</p>'
+        '<div class="grok-suggestions">'
+        '<span class="grok-chip">Write a short story</span>'
+        '<span class="grok-chip">Explain quantum computing</span>'
+        '<span class="grok-chip">Debug my code</span>'
+        '<span class="grok-chip">Brainstorm ideas</span>'
+        '</div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
 # Display chat history
 for msg in st.session_state["messages"]:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
 # ---------------------------------------------------------------------------
-# Input: voice OR text
+# Input: voice + text
 # ---------------------------------------------------------------------------
 
-col1, col2 = st.columns([1, 3])
-with col1:
-    # st.audio_input returns None when mic permission is denied or unavailable.
-    # Wrap in try/except for edge-case Streamlit versions that raise.
+# Mic input (collapsible, secondary to text)
+with st.expander("🎤 Voice input", expanded=False):
     try:
-        audio_input = st.audio_input("🎤 Speak", key="mic")
+        audio_input = st.audio_input("Record", key="mic")
     except Exception:
         audio_input = None
         st.caption("Mic unavailable.")
-with col2:
-    text_input = st.chat_input("Type a message…")
 
-# Hint when mic returns nothing (permission denied / no hardware)
-if audio_input is None and "mic_hint_shown" not in st.session_state:
-    st.session_state["mic_hint_shown"] = True
-    st.info(
-        "🎤 No microphone detected. If you denied permission, "
-        "click the lock/camera icon in your browser's address bar to allow it. "
-        "You can always type instead."
-    )
+# Primary text input (Grok-style prominent bottom bar)
+text_input = st.chat_input("Ask Baccano anything…")
 
 user_text = None
 
 # Voice input: deduplicate by hashing audio bytes so reruns don't re-transcribe
 if audio_input is not None:
-    st.session_state.pop("mic_hint_shown", None)  # mic works, clear hint
     audio_bytes = audio_input.getvalue()
     audio_hash = hashlib.sha256(audio_bytes).hexdigest()[:16]
     if audio_hash != st.session_state.get("last_audio_hash"):
