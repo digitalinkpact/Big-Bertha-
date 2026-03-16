@@ -220,6 +220,9 @@ def _get_agent(chosen_model: str = "Auto (config default)") -> tuple[AgentLoop, 
     workspace = config.workspace_path
     workspace.mkdir(parents=True, exist_ok=True)
 
+    # Brave Search key: config → env var → (tool auto-falls back to DuckDuckGo)
+    brave_key = config.tools.web.search.api_key or os.environ.get("BRAVE_API_KEY") or None
+
     bus = MessageBus()
     agent = AgentLoop(
         bus=bus,
@@ -228,9 +231,11 @@ def _get_agent(chosen_model: str = "Auto (config default)") -> tuple[AgentLoop, 
         model=model,
         max_iterations=config.agents.defaults.max_tool_iterations,
         context_window_tokens=config.agents.defaults.context_window_tokens,
-        brave_api_key=config.tools.web.search.api_key or None,
+        brave_api_key=brave_key,
         web_proxy=config.tools.web.proxy,
+        exec_config=config.tools.exec,
         restrict_to_workspace=config.tools.restrict_to_workspace,
+        mcp_servers=config.tools.mcp_servers if config.tools.mcp_servers else None,
     )
     st.session_state[cache_key] = (agent, model)
     return agent, model
