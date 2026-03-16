@@ -70,11 +70,7 @@ class WebSearchTool(Tool):
 
     async def execute(self, query: str, count: int | None = None, **kwargs: Any) -> str:
         if not self.api_key:
-            return (
-                "Error: Brave Search API key not configured. Set it in "
-                "~/.nanobot/config.json under tools.web.search.apiKey "
-                "(or export BRAVE_API_KEY), then restart the gateway."
-            )
+            return await self._duckduckgo_fallback(query, count)
 
         try:
             n = min(max(count or self.max_results, 1), 10)
@@ -104,6 +100,46 @@ class WebSearchTool(Tool):
         except Exception as e:
             logger.error("WebSearch error: {}", e)
             return f"Error: {e}"
+
+    async def _duckduckgo_fallback(self, query: str, count: int | None = None) -> str:
+        """Free web search via DuckDuckGo HTML when no Brave API key is set."""
+        n = min(max(count or self.max_results, 1), 10)
+        try:
+            async with httpx.AsyncClient(proxy=self.proxy) as client:
+                r = await client.get(
+                    "https://html.duckduckgo.com/html/",
+                    params={"q": query},
+                    headers={"User-Agent": USER_AGENT},
+                    timeout=10.0,
+                )
+                r.raise_for_status()
+
+            results = []
+            # Parse DuckDuckGo HTML results
+            blocks = re.findall(
+                r'<a rel="nofollow" class="result__a" href="([^"]+)"[^>]*>(.*?)</a>.*?'
+                r'<a class="result__snippet"[^>]*>(.*?)</a>',
+                r.text, re.DOTALL,
+            )
+            for url, title, snippet in blocks[:n]:
+                results.append({
+                    "title": _strip_tags(title),
+                    "url": html.unescape(url),
+                    "description": _strip_tags(snippet),
+                })
+
+            if not results:
+                return f"No results for: {query}"
+
+            lines = [f"Results for: {query}\n"]
+            for i, item in enumerate(results, 1):
+                lines.append(f"{i}. {item['title']}\n   {item['url']}")
+                if item["description"]:
+                    lines.append(f"   {item['description']}")
+            return "\n".join(lines)
+        except Exception as e:
+            logger.error("DuckDuckGo fallback error: {}", e)
+            return f"Error searching: {e}"
 
 
 class WebFetchTool(Tool):

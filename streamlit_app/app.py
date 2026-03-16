@@ -202,6 +202,9 @@ def _get_agent(chosen_model: str = "Auto (config default)") -> tuple[AgentLoop, 
         model=model,
         max_iterations=config.agents.defaults.max_tool_iterations,
         context_window_tokens=config.agents.defaults.context_window_tokens,
+        brave_api_key=config.tools.web.search.api_key or None,
+        web_proxy=config.tools.web.proxy,
+        restrict_to_workspace=config.tools.restrict_to_workspace,
     )
     st.session_state[cache_key] = (agent, model)
     return agent, model
