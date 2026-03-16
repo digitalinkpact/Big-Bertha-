@@ -284,13 +284,14 @@ class AuthService:
         return self._update_user_flag(user_id, "is_admin", 0)
 
     def _update_user_flag(self, user_id: int, flag: str, value: int) -> bool:
-        allowed = {"is_approved", "is_deleted", "is_admin", "is_email_confirmed"}
-        if flag not in allowed:
-            raise ValueError(f"Invalid flag: {flag}")
+        # Column name is validated, never from user input — safe for f-string SQL
+        _ALLOWED_FLAGS = {"is_approved", "is_deleted", "is_admin", "is_email_confirmed"}
+        if flag not in _ALLOWED_FLAGS:
+            raise ValueError(f"Invalid flag: {flag!r}. Must be one of {_ALLOWED_FLAGS}")
         conn = get_connection()
         try:
             conn.execute(
-                f"UPDATE users SET {flag} = ?, updated_at = ? WHERE id = ?",
+                f"UPDATE users SET {flag} = ?, updated_at = ? WHERE id = ?",  # noqa: S608
                 (value, _utcnow(), user_id),
             )
             conn.commit()

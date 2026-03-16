@@ -14,6 +14,7 @@ Features:
 
 import asyncio
 import hashlib
+import json
 import os
 import re
 import sys
@@ -42,8 +43,8 @@ init_db()
 # ---------------------------------------------------------------------------
 # Constants / limits
 # ---------------------------------------------------------------------------
-_MAX_MESSAGES_PER_SESSION = 100  # rate limit: max messages before cooldown
-_RATE_COOLDOWN_SECONDS = 60     # wait time after hitting limit
+_MAX_MESSAGES_PER_MINUTE = 100   # rate limit: max messages per cooldown window
+_RATE_WINDOW_SECONDS = 60        # rolling window size
 _MAX_TEXT_LENGTH = 4000          # max chars per user message
 _MAX_AUDIO_BYTES = 10 * 1024 * 1024  # 10 MB max audio upload
 
@@ -79,7 +80,15 @@ def _ls_get(key: str, default=None):
     if _ls is None:
         return default
     val = _ls.getItem(key)
-    return val if val is not None else default
+    if val is None:
+        return default
+    # streamlit-local-storage may return raw JSON strings — parse them
+    if isinstance(val, str):
+        try:
+            val = json.loads(val)
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return val
 
 
 def _ls_set(key: str, value):
@@ -309,6 +318,9 @@ def _text_to_speech(text: str, rate: int = 175) -> bytes | None:
 
 def _autoplay_audio_html(audio_bytes: bytes) -> None:
     """Inject an HTML <audio autoplay> tag as fallback for browsers that block st.audio autoplay."""
+    # Skip if audio is too large for inline base64 (>2MB would bloat the DOM)
+    if len(audio_bytes) > 2 * 1024 * 1024:
+        return
     import base64
     b64 = base64.b64encode(audio_bytes).decode()
     st.markdown(
@@ -379,23 +391,27 @@ def _get_agent_reply(user_text: str, model_choice: str = "Auto (config default)"
             if not pcfg.api_key or name == _model.split("/")[0]:
                 continue  # skip unconfigured or the one that just failed
             try:
-                fb_provider = LiteLLMProvider(
-                    api_key=pcfg.api_key,
-                    api_base=pcfg.api_base,
-                    default_model=fallback_model,
-                    provider_name=name,
-                )
-                fb_agent = AgentLoop(
-                    bus=MessageBus(),
-                    provider=fb_provider,
-                    workspace=config.workspace_path,
-                    model=fallback_model,
-                    max_iterations=config.agents.defaults.max_tool_iterations,
-                    context_window_tokens=config.agents.defaults.context_window_tokens,
-                    brave_api_key=config.tools.web.search.api_key or None,
-                    web_proxy=config.tools.web.proxy,
-                    restrict_to_workspace=config.tools.restrict_to_workspace,
-                )
+                # Cache fallback agents in session_state to avoid leaking AgentLoop objects
+                fb_cache_key = f"_fb_agent_{name}"
+                if fb_cache_key not in st.session_state:
+                    fb_provider = LiteLLMProvider(
+                        api_key=pcfg.api_key,
+                        api_base=pcfg.api_base,
+                        default_model=fallback_model,
+                        provider_name=name,
+                    )
+                    st.session_state[fb_cache_key] = AgentLoop(
+                        bus=MessageBus(),
+                        provider=fb_provider,
+                        workspace=config.workspace_path,
+                        model=fallback_model,
+                        max_iterations=config.agents.defaults.max_tool_iterations,
+                        context_window_tokens=config.agents.defaults.context_window_tokens,
+                        brave_api_key=config.tools.web.search.api_key or None,
+                        web_proxy=config.tools.web.proxy,
+                        restrict_to_workspace=config.tools.restrict_to_workspace,
+                    )
+                fb_agent = st.session_state[fb_cache_key]
                 fb_reply = _run_async(fb_agent.process_direct(user_text, session_key=session_key))
                 if fb_reply and not fb_reply.startswith("Error calling LLM:"):
                     return fb_reply
@@ -436,8 +452,19 @@ if _current_user:
 st.title("🤖 Baccano AI")
 
 # Sidebar: settings & memory
-chosen_model = "Auto (config default)"  # always auto — provider routing is internal
 with st.sidebar:
+    st.header("⚙️ Model")
+    config = _load_baccano_config()
+    model_labels = _available_models(config)
+    chosen_model = st.selectbox(
+        "LLM provider",
+        model_labels,
+        index=0,
+        help="Ollama = fastest/most private (local). Grok/DeepSeek = cloud. Auto = best available.",
+    )
+    _agent, active_model = _get_agent(chosen_model)
+    st.caption(f"Active: `{active_model}`")
+
     st.divider()
     st.header("🔊 Voice")
     tts_enabled = st.toggle("Speak replies", value=True)
@@ -511,8 +538,7 @@ if audio_input is None and "mic_hint_shown" not in st.session_state:
     st.info(
         "🎤 No microphone detected. If you denied permission, "
         "click the lock/camera icon in your browser's address bar to allow it. "
-        "You can always type instead.",
-        icon="ℹ️",
+        "You can always type instead."
     )
 
 user_text = None
@@ -549,13 +575,13 @@ if user_text:
     if now > rate_reset:
         msg_count = 0
 
-    if msg_count >= _MAX_MESSAGES_PER_SESSION:
+    if msg_count >= _MAX_MESSAGES_PER_MINUTE:
         wait = int(rate_reset - now)
-        st.warning(f"Rate limit reached ({_MAX_MESSAGES_PER_SESSION} messages). Wait {max(wait, 1)}s.")
+        st.warning(f"Rate limit reached ({_MAX_MESSAGES_PER_MINUTE} messages/min). Wait {max(wait, 1)}s.")
     else:
         msg_count += 1
         if msg_count == 1:
-            st.session_state["rate_reset"] = now + _RATE_COOLDOWN_SECONDS
+            st.session_state["rate_reset"] = now + _RATE_WINDOW_SECONDS
         st.session_state["msg_count"] = msg_count
 
         # Show user message
