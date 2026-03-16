@@ -342,8 +342,16 @@ def _get_agent_reply(user_text: str, model_choice: str = "Auto (config default)"
     fallback chain so the user still gets a response.
     """
     agent, _model = _get_agent(model_choice)
+
+    # Use a per-browser-session key so separate users don't share context.
+    # Generate once per Streamlit session to avoid stale history pollution.
+    if "_agent_session_key" not in st.session_state:
+        import uuid
+        st.session_state["_agent_session_key"] = f"streamlit:{uuid.uuid4().hex[:12]}"
+    session_key = st.session_state["_agent_session_key"]
+
     try:
-        reply = _run_async(agent.process_direct(user_text))
+        reply = _run_async(agent.process_direct(user_text, session_key=session_key))
     except TimeoutError:
         reply = "The model took too long to respond. Please try again."
     except Exception as e:
@@ -457,6 +465,10 @@ with st.sidebar:
         if st.button("🗑️ Clear history"):
             st.session_state["messages"] = []
             _ls_set("baccano_chat_history", [])
+            # Clear cached agents and session key so a fresh context starts
+            for key in list(st.session_state.keys()):
+                if key.startswith("_agent_"):
+                    del st.session_state[key]
             st.rerun()
     with col_b:
         if st.button("🗑️ Clear memory"):
@@ -559,6 +571,9 @@ if user_text:
             with st.spinner("Thinking…"):
                 reply = _get_agent_reply(user_text, model_choice=chosen_model)
             st.markdown(reply)
+            # Show which model responded
+            _, _active_model = _get_agent(chosen_model)
+            st.caption(f"_Model: {_active_model}_")
 
         st.session_state["messages"].append({"role": "assistant", "content": reply})
 
