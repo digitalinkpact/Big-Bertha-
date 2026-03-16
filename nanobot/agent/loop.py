@@ -198,12 +198,18 @@ class AgentLoop:
             iteration += 1
 
             tool_defs = self.tools.get_definitions()
+            tool_names = [t["function"]["name"] for t in tool_defs]
+            logger.info("AgentLoop iter {}: model={}, tools={}, msgs={}",
+                        iteration, self.model, tool_names, len(messages))
 
             response = await self.provider.chat_with_retry(
                 messages=messages,
                 tools=tool_defs,
                 model=self.model,
             )
+            logger.info("AgentLoop response: has_tool_calls={}, finish={}, content_len={}",
+                        response.has_tool_calls, response.finish_reason,
+                        len(response.content or ""))
 
             if response.has_tool_calls:
                 if on_progress:

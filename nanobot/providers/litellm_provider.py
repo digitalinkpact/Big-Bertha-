@@ -271,9 +271,12 @@ class LiteLLMProvider(LLMProvider):
             kwargs["tool_choice"] = tool_choice or "auto"
 
         try:
+            logger.info("LiteLLM call: model={}, tools={}, msgs={}",
+                        kwargs.get("model"), len(tools) if tools else 0, len(kwargs.get("messages", [])))
             response = await acompletion(**kwargs)
             return self._parse_response(response)
         except Exception as e:
+            logger.error("LiteLLM error: model={}, error={}", kwargs.get("model"), str(e)[:200])
             # Return error as content for graceful handling
             return LLMResponse(
                 content=f"Error calling LLM: {str(e)}",

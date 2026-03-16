@@ -350,6 +350,9 @@ def _get_agent_reply(user_text: str, model_choice: str = "Auto (config default)"
         st.session_state["_agent_session_key"] = f"streamlit:{uuid.uuid4().hex[:12]}"
     session_key = st.session_state["_agent_session_key"]
 
+    import logging
+    logging.info(f"[Baccano] Primary model: {_model}, session: {session_key}")
+
     try:
         reply = _run_async(agent.process_direct(user_text, session_key=session_key))
     except TimeoutError:
@@ -357,8 +360,12 @@ def _get_agent_reply(user_text: str, model_choice: str = "Auto (config default)"
     except Exception as e:
         reply = f"Error calling LLM: {e}"
 
+    logging.info(f"[Baccano] Primary reply status: {'OK' if reply and not reply.startswith('Error') else 'FAILED'}")
+    logging.info(f"[Baccano] Reply preview: {(reply or '')[:100]}")
+
     # If the LLM returned an error (quota, auth, etc.), try fallback providers
     if reply and reply.startswith("Error calling LLM:"):
+        logging.error(f"[Baccano] Primary FAILED: {reply[:200]}")
         original_error = reply
         config = _load_baccano_config()
         fallback_order = [
@@ -387,9 +394,8 @@ def _get_agent_reply(user_text: str, model_choice: str = "Auto (config default)"
                     web_proxy=config.tools.web.proxy,
                     restrict_to_workspace=config.tools.restrict_to_workspace,
                 )
-                fb_reply = _run_async(fb_agent.process_direct(user_text))
+                fb_reply = _run_async(fb_agent.process_direct(user_text, session_key=session_key))
                 if fb_reply and not fb_reply.startswith("Error calling LLM:"):
-                    st.toast(f"Primary model failed — responded via {name.upper()}", icon="⚡")
                     return fb_reply
             except Exception:
                 continue
@@ -428,19 +434,8 @@ if _current_user:
 st.title("🤖 Baccano AI")
 
 # Sidebar: settings & memory
+chosen_model = "Auto (config default)"  # always auto — provider routing is internal
 with st.sidebar:
-    st.header("⚙️ Model")
-    config = _load_baccano_config()
-    model_labels = _available_models(config)
-    chosen_model = st.selectbox(
-        "LLM provider",
-        model_labels,
-        index=0,
-        help="Ollama = fastest/most private (local). Grok/DeepSeek = cloud fallback.",
-    )
-    _agent, active_model = _get_agent(chosen_model)
-    st.caption(f"Active: `{active_model}`")
-
     st.divider()
     st.header("🔊 Voice")
     tts_enabled = st.toggle("Speak replies", value=True)
@@ -571,9 +566,6 @@ if user_text:
             with st.spinner("Thinking…"):
                 reply = _get_agent_reply(user_text, model_choice=chosen_model)
             st.markdown(reply)
-            # Show which model responded
-            _, _active_model = _get_agent(chosen_model)
-            st.caption(f"_Model: {_active_model}_")
 
         st.session_state["messages"].append({"role": "assistant", "content": reply})
 
