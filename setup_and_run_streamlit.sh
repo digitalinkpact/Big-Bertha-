@@ -13,7 +13,7 @@ source .venv/bin/activate
 pip install --upgrade pip -q
 
 echo "=== Step 2: Install nanobot + streamlit deps ==="
-pip install -e ".[dev]"
+pip install -e ".[dev,streamlit]"
 pip install -r streamlit_app/requirements.txt
 
 echo "=== Step 3: Git commit & push ==="

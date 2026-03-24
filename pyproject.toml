@@ -78,6 +78,7 @@ streamlit = [
     "streamlit-local-storage>=0.0.20",
     "pyttsx3>=2.98",
     "bcrypt>=4.0.0",
+    "python-dotenv>=1.0.0",
     "selenium>=4.20.0,<5.0.0",
 ]
 

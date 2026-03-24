@@ -202,7 +202,8 @@ def _build_provider(config: Config, chosen_label: str = "Auto (config default)")
             ), default_model
 
     # Ultimate fallback
-    matched_cfg, matched_name = config._match_provider()
+    matched_cfg = config.get_provider()
+    matched_name = config.get_provider_name() or "openai"
     model = defaults.model
     return LiteLLMProvider(
         api_key=matched_cfg.api_key if matched_cfg else "",
@@ -665,9 +666,12 @@ st.markdown(
 # ---------------------------------------------------------------------------
 # Sidebar (clean, minimal)
 # ---------------------------------------------------------------------------
-chosen_model = "Auto (config default)"
 with st.sidebar:
+    config = _load_baccano_config()
+    available = _available_models(config)
+    chosen_model = st.selectbox("Model", available, index=len(available) - 1)
     _agent, active_model = _get_agent(chosen_model)
+    st.caption(f"Active: `{active_model}`")
 
     if _current_user:
         st.caption(f"{_current_user.get('email', '')}")
@@ -696,7 +700,7 @@ with st.sidebar:
             st.session_state["messages"] = []
             _ls_set("baccano_chat_history", [])
             for key in list(st.session_state.keys()):
-                if key.startswith("_agent_"):
+                if key.startswith(("_agent_", "_fb_agent_")):
                     del st.session_state[key]
             st.rerun()
     with col_b:
