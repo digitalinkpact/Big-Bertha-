@@ -121,14 +121,14 @@ _MODEL_OPTIONS: dict[str, tuple[str, str]] = {
 
 
 def _available_models(config: Config) -> list[str]:
-    """Return labels of models that are actually configured."""
+    """Return labels of models that are actually configured (config + env vars)."""
     providers = config.providers
     available = []
     checks = [
-        ("ChatGPT (OpenAI)", lambda: bool(providers.openai.api_key)),
+        ("ChatGPT (OpenAI)", lambda: bool(providers.openai.api_key or os.environ.get("OPENAI_API_KEY"))),
         ("Ollama (local)", lambda: bool(providers.ollama.api_base)),
-        ("Grok (XAI)", lambda: bool(providers.xai.api_key)),
-        ("DeepSeek", lambda: bool(providers.deepseek.api_key)),
+        ("Grok (XAI)", lambda: bool(providers.xai.api_key or os.environ.get("XAI_API_KEY"))),
+        ("DeepSeek", lambda: bool(providers.deepseek.api_key or os.environ.get("DEEPSEEK_API_KEY"))),
     ]
     for label, is_ready in checks:
         if is_ready():
@@ -145,7 +145,7 @@ def _get_api_key(pcfg, env_var: str) -> str:
         return os.environ[env_var]
     try:
         return st.secrets.get(env_var, "")
-    except (KeyError, FileNotFoundError):
+    except FileNotFoundError:
         return ""
 
 
@@ -162,12 +162,22 @@ def _build_provider(config: Config, chosen_label: str = "Auto (config default)")
     defaults = config.agents.defaults
 
     # --- Explicit user choice from sidebar ---
+    _env_var_map = {
+        "openai": "OPENAI_API_KEY",
+        "xai": "XAI_API_KEY",
+        "deepseek": "DEEPSEEK_API_KEY",
+        "groq": "GROQ_API_KEY",
+    }
     if chosen_label != "Auto (config default)" and chosen_label in _MODEL_OPTIONS:
         prov_name, model_str = _MODEL_OPTIONS[chosen_label]
         pcfg = getattr(providers, prov_name, None)
         if pcfg:
+            env_var = _env_var_map.get(prov_name, "")
+            api_key = _get_api_key(pcfg, env_var) if env_var else (pcfg.api_key or None)
+            if env_var and api_key:
+                os.environ[env_var] = api_key
             return LiteLLMProvider(
-                api_key=pcfg.api_key or None,
+                api_key=api_key or None,
                 api_base=pcfg.api_base,
                 default_model=model_str,
                 provider_name=prov_name,
@@ -205,8 +215,11 @@ def _build_provider(config: Config, chosen_label: str = "Auto (config default)")
     matched_cfg = config.get_provider()
     matched_name = config.get_provider_name() or "openai"
     model = defaults.model
+    env_var = _env_var_map.get(matched_name, "")
+    fallback_key = (_get_api_key(matched_cfg, env_var) if env_var and matched_cfg else
+                    (matched_cfg.api_key if matched_cfg else ""))
     return LiteLLMProvider(
-        api_key=matched_cfg.api_key if matched_cfg else "",
+        api_key=fallback_key or None,
         api_base=matched_cfg.api_base if matched_cfg else None,
         default_model=model,
         provider_name=matched_name,
