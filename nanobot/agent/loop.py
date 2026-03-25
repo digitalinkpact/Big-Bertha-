@@ -141,6 +141,15 @@ class AgentLoop:
         except ImportError:
             pass  # desktop package not available (e.g. cloud deployment)
 
+        # Register trading tool (Binance.US) when API keys are configured.
+        try:
+            import os
+            if os.environ.get("BINANCE_US_API_KEY"):
+                from nanobot.agent.tools.trading import TradingTool
+                self.tools.register(TradingTool())
+        except ImportError:
+            pass  # trading dependencies not installed
+
     async def _connect_mcp(self) -> None:
         """Connect to configured MCP servers (one-time, lazy)."""
         if self._mcp_connected or self._mcp_connecting or not self._mcp_servers:

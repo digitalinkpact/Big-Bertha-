@@ -1,0 +1,14 @@
+{
+  "name": "Baccano AI",
+  "forwardPorts": [8501, 18790],
+  "portsAttributes": {
+    "8501": {
+      "label": "Streamlit UI",
+      "onAutoForward": "notify"
+    },
+    "18790": {
+      "label": "Baccano Gateway",
+      "onAutoForward": "silent"
+    }
+  }
+}

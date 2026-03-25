@@ -1,4 +1,11 @@
 {
   "version": "2.0.0",
-  "tasks": []
+  "tasks": [
+    {
+      "label": "git-commit-trading",
+      "type": "shell",
+      "command": "git add -A && git commit -m 'feat: add Binance.US trading subsystem'",
+      "presentation": { "reveal": "always", "panel": "new" }
+    }
+  ]
 }

@@ -23,7 +23,8 @@ RUN mkdir -p nanobot bridge && touch nanobot/__init__.py && \
 # Copy the full source and install
 COPY nanobot/ nanobot/
 COPY bridge/ bridge/
-RUN uv pip install --system --no-cache .
+COPY streamlit_app/ streamlit_app/
+RUN uv pip install --system --no-cache ".[streamlit]"
 
 # Build the WhatsApp bridge
 WORKDIR /app/bridge
@@ -33,8 +34,9 @@ WORKDIR /app
 # Create config directory
 RUN mkdir -p /root/.nanobot
 
-# Gateway default port
+# Gateway default port + Streamlit port
 EXPOSE 18790
+EXPOSE 8501
 
 ENTRYPOINT ["baccano"]
 CMD ["status"]

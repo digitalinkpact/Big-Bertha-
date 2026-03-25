@@ -29,3 +29,22 @@ services:
     command: ["status"]
     stdin_open: true
     tty: true
+
+  baccano-streamlit:
+    container_name: baccano-streamlit
+    <<: *common-config
+    entrypoint: ["streamlit", "run", "streamlit_app/app.py", "--server.address", "0.0.0.0", "--server.port", "8501", "--server.headless", "true"]
+    command: []
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    environment:
+      - NANOBOT_BASE_URL=http://localhost:8501
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
