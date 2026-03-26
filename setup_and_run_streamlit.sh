@@ -21,7 +21,10 @@ git add streamlit_app/ || true
 git commit -m "feat: add Streamlit voice chatbot UI with provider routing" 2>/dev/null || echo "(already committed or nothing to commit)"
 git push origin feature/xai-provider 2>/dev/null || echo "(push failed or already up to date)"
 
-echo "=== Step 4: Run Streamlit on 0.0.0.0:8501 ==="
+echo "=== Step 4: Free port 8501 if occupied ==="
+fuser -k 8501/tcp 2>/dev/null || true
+
+echo "=== Step 5: Run Streamlit on 0.0.0.0:8501 ==="
 cd "$WORKSPACE"
 exec streamlit run streamlit_app/app.py \
   --server.address 0.0.0.0 \

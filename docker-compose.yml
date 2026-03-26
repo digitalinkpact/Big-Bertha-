@@ -2,6 +2,9 @@ x-common-config: &common-config
   build:
     context: .
     dockerfile: Dockerfile
+  env_file:
+    - path: .env
+      required: false
   volumes:
     - ~/.nanobot:/root/.nanobot
 
@@ -38,8 +41,6 @@ services:
     restart: unless-stopped
     ports:
       - "8501:8501"
-    environment:
-      - NANOBOT_BASE_URL=http://localhost:8501
     deploy:
       resources:
         limits:

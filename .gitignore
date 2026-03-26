@@ -25,3 +25,7 @@ poetry.lock
 botpy.log
 nano.*.save
 
+# macOS artifacts
+*.textClipping
+.DS_Store
+

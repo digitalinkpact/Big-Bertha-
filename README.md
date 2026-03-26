@@ -20,6 +20,8 @@
 
 ## 📢 News
 
+- **2026-03-09** 📈 Added **Binance.US trading subsystem** — real-time market analysis, DCA/Grid/Momentum strategies, price alerts, and portfolio monitoring. See [Trading](#-trading).
+- **2026-03-09** 🖥️ Added **Streamlit Web UI** — browser-based multi-user interface with voice input (Groq Whisper) and TTS. See [Web UI](#️-web-ui-streamlit).
 - **2026-03-08** 🚀 Released **v0.1.4.post4** — a reliability-packed release with safer defaults, better multi-instance support, sturdier MCP, and major channel and provider improvements. Please see [release notes](https://github.com/HKUDS/nanobot/releases/tag/v0.1.4.post4) for details.
 - **2026-03-07** 🚀 Azure OpenAI provider, WhatsApp media, QQ group chats, and more Telegram/Feishu polish.
 - **2026-03-06** 🪄 Lighter providers, smarter media handling, and sturdier memory and CLI compatibility.
@@ -86,7 +88,9 @@
 - [Features](#-features)
 - [Install](#-install)
 - [Quick Start](#-quick-start)
+- [Web UI](#️-web-ui-streamlit)
 - [Chat Apps](#-chat-apps)
+- [Trading](#-trading)
 - [Agent Social Network](#-agent-social-network)
 - [Configuration](#️-configuration)
 - [Multiple Instances](#-multiple-instances)
@@ -165,6 +169,16 @@ rm -rf ~/.nanobot/bridge
 nanobot channels login
 ```
 
+### Optional extras
+
+| Extra | Install | Description |
+|-------|---------|-------------|
+| `trading` | `pip install -e ".[trading]"` | Binance.US trading (market analysis, orders, strategies) |
+| `streamlit` | `pip install -e ".[streamlit]"` | Browser-based Web UI (voice input, multi-user auth) |
+| `browser` | `pip install -e ".[browser]"` | Selenium browser automation tool |
+| `matrix` | `pip install -e ".[matrix]"` | Matrix (Element) channel |
+| `wecom` | `pip install -e ".[wecom]"` | WeCom (企业微信) channel |
+
 ## 🚀 Quick Start
 
 > [!TIP]
@@ -212,7 +226,39 @@ nanobot agent
 
 That's it! You have a working AI assistant in 2 minutes.
 
-## 💬 Chat Apps
+## �️ Web UI (Streamlit)
+
+nanobot ships with a browser-based UI for users who prefer a web interface over the CLI or chat apps.
+
+**Install and start:**
+
+```bash
+pip install -e ".[streamlit]"
+streamlit run streamlit_app/app.py
+```
+
+Open `http://localhost:8501` in your browser.
+
+**Features:**
+
+- Multi-user authentication (SQLite-backed local user store)
+- Voice input via Groq Whisper (set `GROQ_API_KEY` to enable)
+- Text-to-speech playback (pyttsx3)
+- Provider routing: OpenAI, Ollama, Grok/xAI, DeepSeek, or Auto
+- Calls the same `AgentLoop` core used by the gateway
+
+**Docker:**
+
+```bash
+docker compose up -d baccano-streamlit
+```
+
+Access at `http://localhost:8501`.
+
+> [!TIP]
+> Both `baccano-gateway` and `baccano-streamlit` can run simultaneously — they share the same config volume at `~/.nanobot`.
+
+## �💬 Chat Apps
 
 Connect nanobot to your favorite chat platform.
 
@@ -1149,6 +1195,18 @@ nanobot gateway --config ~/.nanobot-telegram/config.json --workspace /tmp/nanobo
 Interactive mode exits: `exit`, `quit`, `/exit`, `/quit`, `:q`, or `Ctrl+D`.
 
 <details>
+<summary><b>Special Commands</b></summary>
+
+| Command | Description |
+|---------|-------------|
+| `/new` | Clear the current conversation session |
+| `/stop` | Cancel the running task |
+| `/restart` | Restart the agent in-place |
+| `/help` | List available commands |
+
+</details>
+
+<details>
 <summary><b>Heartbeat (Periodic Tasks)</b></summary>
 
 The gateway wakes up every 30 minutes and checks `HEARTBEAT.md` in your workspace (`~/.nanobot/workspace/HEARTBEAT.md`). If the file has tasks, the agent executes them and delivers results to your most recently active chat channel.
@@ -1168,7 +1226,55 @@ The agent can also manage this file itself — ask it to "add a periodic task" a
 
 </details>
 
-## 🐳 Docker
+## � Trading (Binance.US)
+
+nanobot integrates a Binance.US trading subsystem when the `trading` extra is installed and `BINANCE_US_API_KEY` is set.
+
+**Install:**
+
+```bash
+pip install -e ".[trading]"
+```
+
+**Configure (environment variables):**
+
+```bash
+export BINANCE_US_API_KEY=your_api_key
+export BINANCE_US_API_SECRET=your_api_secret
+export BINANCE_US_DAILY_LIMIT=100   # optional: max USD to spend per day (default: 100)
+```
+
+The `trading` tool is automatically registered in the agent when `BINANCE_US_API_KEY` is detected at startup.
+
+**Available actions:**
+
+| Action | Description |
+|--------|-------------|
+| `ticker` | Real-time price for a symbol (e.g. `BTC/USDT`) |
+| `analyze` | Technical analysis — RSI, MACD, Bollinger Bands, EMA, ATR, OBV |
+| `balance` | Account balance across all assets |
+| `buy` / `sell` | Place a market or limit order |
+| `cancel_order` | Cancel an open order by ID |
+| `open_orders` | List all open orders |
+| `portfolio` | Holdings snapshot with unrealised P&L |
+| `add_alert` | Create a price alert (`price_above`, `price_below`, `volume_spike`) |
+| `list_alerts` / `check_alerts` | View and evaluate active alerts |
+| `strategies` | List available strategies (DCA, Grid, Momentum) |
+
+**Composite signal output:** `STRONG_BUY` / `BUY` / `NEUTRAL` / `SELL` / `STRONG_SELL` with a score and reasoning.
+
+> [!IMPORTANT]
+> A daily spending limit (`BINANCE_US_DAILY_LIMIT`, default `$100`) is enforced to guard against runaway trades. The agent will refuse orders that exceed the remaining daily budget.
+
+**Example:**
+
+```
+> Analyze BTC and tell me if I should buy.
+```
+
+nanobot calls `analyze` → computes technicals → returns a composite signal with reasons, then proposes a trade if the signal is strong.
+
+## �🐳 Docker
 
 > [!TIP]
 > The `-v ~/.nanobot:/root/.nanobot` flag mounts your local config directory into the container, so your config and workspace persist across container restarts.
@@ -1176,14 +1282,15 @@ The agent can also manage this file itself — ask it to "add a periodic task" a
 ### Docker Compose
 
 ```bash
-docker compose run --rm nanobot-cli onboard   # first-time setup
+docker compose run --rm baccano-cli onboard    # first-time setup
 vim ~/.nanobot/config.json                     # add API keys
-docker compose up -d nanobot-gateway           # start gateway
+docker compose up -d baccano-gateway           # start gateway
+docker compose up -d baccano-streamlit         # (optional) start Web UI on :8501
 ```
 
 ```bash
-docker compose run --rm nanobot-cli agent -m "Hello!"   # run CLI
-docker compose logs -f nanobot-gateway                   # view logs
+docker compose run --rm baccano-cli agent -m "Hello!"   # run CLI
+docker compose logs -f baccano-gateway                   # view logs
 docker compose down                                      # stop
 ```
 
@@ -1265,21 +1372,29 @@ If you edit the `.service` file itself, run `systemctl --user daemon-reload` bef
 ```
 nanobot/
 ├── agent/          # 🧠 Core agent logic
-│   ├── loop.py     #    Agent loop (LLM ↔ tool execution)
-│   ├── context.py  #    Prompt builder
-│   ├── memory.py   #    Persistent memory
+│   ├── loop.py     #    Agent loop (LLM ↔ tool execution, max 40 iterations)
+│   ├── context.py  #    Prompt builder (system prompt + MEMORY.md + skills)
+│   ├── memory.py   #    Persistent memory (MEMORY.md + HISTORY.md)
 │   ├── skills.py   #    Skills loader
 │   ├── subagent.py #    Background task execution
-│   └── tools/      #    Built-in tools (incl. spawn)
-├── skills/         # 🎯 Bundled skills (github, weather, tmux...)
-├── channels/       # 📱 Chat channel integrations
-├── bus/            # 🚌 Message routing
-├── cron/           # ⏰ Scheduled tasks
-├── heartbeat/      # 💓 Proactive wake-up
-├── providers/      # 🤖 LLM providers (OpenRouter, etc.)
-├── session/        # 💬 Conversation sessions
-├── config/         # ⚙️ Configuration
-└── cli/            # 🖥️ Commands
+│   └── tools/      #    Built-in tools (incl. spawn, trading)
+├── skills/         # 🎯 Bundled skills (github, weather, tmux, trading...)
+├── channels/       # 📱 Chat channel integrations (11 platforms)
+├── bus/            # 🚌 Async message bus (inbound/outbound queues)
+├── cron/           # ⏰ Scheduled tasks (at/every/cron)
+├── heartbeat/      # 💓 Proactive wake-up (checks HEARTBEAT.md every 30 min)
+├── providers/      # 🤖 LLM providers (25+, via LiteLLM)
+├── session/        # 💬 Conversation sessions (JSONL persistence)
+├── config/         # ⚙️ Configuration (Pydantic schema)
+└── cli/            # 🖥️ Commands (onboard/gateway/agent/status/channels)
+trading/            # 📈 Binance.US trading subsystem
+├── client.py       #    BinanceUSClient (ccxt + daily spending limit guard)
+├── analysis.py     #    Technical analysis (RSI, MACD, Bollinger Bands, EMA, ATR, OBV)
+├── alerts.py       #    Price alerts & portfolio monitor
+├── strategies.py   #    DCA, Grid, and Momentum strategies
+└── config.py       #    Exchange config (loaded from environment variables)
+streamlit_app/      # 🖥️ Browser-based Web UI (port 8501)
+bridge/             # 🌉 WhatsApp WebSocket bridge (Node.js, port 3001)
 ```
 
 ## 🤝 Contribute & Roadmap
