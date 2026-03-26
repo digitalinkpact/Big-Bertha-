@@ -43,10 +43,61 @@ def _password_strong_enough(password: str) -> tuple[bool, str]:
 # Login page
 # ------------------------------------------------------------------
 
+def _first_run_setup() -> bool:
+    """Show a first-run admin creation form when no users exist.
+    Returns True once the admin is created and logged in."""
+    st.title("⚡ Baccano AI — First-time Setup")
+    st.info("No users exist yet. Create your admin account to get started.")
+
+    email = st.text_input("Admin email", key="setup_email")
+    password = st.text_input("Password", type="password", key="setup_password")
+    confirm = st.text_input("Confirm password", type="password", key="setup_confirm")
+
+    if st.button("Create Admin Account", key="setup_btn"):
+        if not email or not password or not confirm:
+            st.error("All fields are required.")
+            return False
+        if not _valid_email(email):
+            st.error("Invalid email format.")
+            return False
+        if password != confirm:
+            st.error("Passwords do not match.")
+            return False
+        ok, msg = _password_strong_enough(password)
+        if not ok:
+            st.error(msg)
+            return False
+
+        try:
+            user, _token = _auth.create_user(email, password)
+            _auth.verify_email_admin(user.id)
+            _auth.approve_user(user.id)
+            _auth.make_admin(user.id)
+        except Exception as e:
+            st.error(f"Failed to create admin: {e}")
+            return False
+
+        st.session_state["authenticated"] = True
+        st.session_state["current_user"] = {
+            "id": user.id,
+            "email": user.email,
+            "is_admin": True,
+        }
+        st.success("Admin account created! Logging you in…")
+        st.rerun()
+        return True
+
+    return False
+
+
 def show_login_page() -> bool:
     """Render login form.  Returns True if user is authenticated."""
     if st.session_state.get("authenticated") and st.session_state.get("current_user"):
         return True
+
+    # First-run: no users in the database yet → show setup screen
+    if not _auth.list_users():
+        return _first_run_setup()
 
     # Handle query params for email verification and password reset
     params = st.query_params

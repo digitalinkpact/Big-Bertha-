@@ -3,22 +3,44 @@
 import sqlite3
 from pathlib import Path
 
-_DB_DIR = Path.home() / ".nanobot"
-_DB_PATH = _DB_DIR / "auth.db"
 
+def _resolve_db_path() -> Path:
+    """Return the first writable path for the auth database.
 
-def _get_db_path() -> Path:
+    Priority:
+      1. NANOBOT_AUTH_DB env var (explicit override)
+      2. ~/.nanobot/auth.db  (standard location)
+      3. <workspace>/.nanobot/auth.db  (Codespaces / Docker: home may be root-owned)
+      4. /tmp/baccano_auth.db  (guaranteed writable on any Linux/macOS)
+    """
     import os
+
+    candidates = []
+
     custom = os.environ.get("NANOBOT_AUTH_DB")
     if custom:
         return Path(custom)
-    return _DB_PATH
+
+    candidates.append(Path.home() / ".nanobot" / "auth.db")
+    candidates.append(Path(__file__).resolve().parent.parent.parent / ".nanobot" / "auth.db")
+    candidates.append(Path("/tmp") / "baccano_auth.db")
+
+    for path in candidates:
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            # Probe writability: try creating/touching the file
+            path.touch(exist_ok=True)
+            return path
+        except (OSError, PermissionError):
+            continue
+
+    # Should never reach here, but satisfy the type checker
+    return candidates[-1]
 
 
 def get_connection() -> sqlite3.Connection:
     """Return a connection with WAL mode and foreign keys enabled."""
-    db_path = _get_db_path()
-    db_path.parent.mkdir(parents=True, exist_ok=True)
+    db_path = _resolve_db_path()
     conn = sqlite3.connect(str(db_path), timeout=10)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
